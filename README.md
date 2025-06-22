@@ -420,6 +420,7 @@ Penjelasan main:
 
 ## Output Code
 
-User Dain tontas: Untuk User dain tontas ini merupakan target dari jebakan kita. jadi dia akan kita fokuskan untuk mencoba soal ini.
+Untuk soal ini saya akan menampilkan dua terminal dimana satu punya Daintontas(Target Troll) dan Sunnybolt (User Biasa)
+
 
 
