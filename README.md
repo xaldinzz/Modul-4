@@ -207,6 +207,217 @@ Penjelasan troll_readdir:
 - Menyembunyikan file .troll_state dari daftar.
 - Jika direktori yang dibaca adalah root FUSE (/), hanya secret_file_name, upload_file_name, . dan .. yang akan ditampilkan kepada pengguna. File lain yang ada di direktori sumber akan disembunyikan.
 
+  ```
+  static int troll_open(const char *path, struct fuse_file_info *fi) {
+    char fpath[PATH_MAX];
+    snprintf(fpath, PATH_MAX, "%s%s", source_path, path);
+    if (strcmp(path + 1, secret_file_name) == 0) {
+        if ((fi->flags & O_ACCMODE) != O_RDONLY) {
+            return -EACCES;
+        }
+        return 0;
+    } else {
+        int res = open(fpath, fi->flags);
+        if (res == -1) {
+            return -errno;
+        }
+        close(res);
+        return 0;
+    }
+
+Penjelasan troll_open:
+Untuk very_spicy_info.txt, ia hanya mengizinkan mode baca (O_RDONLY). Karena kontennya disimulasikan, tidak ada file fisik yang sebenarnya perlu dibuka.
+Untuk file lain, ia mencoba membuka file fisik di source_path.
+
+```
+static int troll_read(const char *path, char *buf, size_t size, off_t offset,
+                      struct fuse_file_info *fi) {
+    int fd = -1;
+    int res;
+
+    char fpath[PATH_MAX];
+    snprintf(fpath, PATH_MAX, "%s%s", source_path, path);
+
+    fprintf(stderr, "TrollFS: troll_read dipanggil untuk path: %s, offset: %zu, size: %zu. Jebakan: %d\n", path, offset, size, trap_triggered);
+
+    uid_t current_uid = fuse_get_context()->uid;
+
+    if (strcmp(path + 1, secret_file_name) == 0) {
+        if (trap_triggered && current_uid == daintontas_uid) {
+            fprintf(stderr, "TrollFS: DainTontas membaca very_spicy_info.txt dengan jebakan aktif. Menampilkan ASCII art.\n");
+            size_t len = strlen(ascii_art_troll);
+            if (offset < len) {
+                if (offset + size > len) {
+                    size = len - offset;
+                }
+                memcpy(buf, ascii_art_troll + offset, size);
+            } else {
+                size = 0;
+            }
+            res = size;
+        } else if (current_uid == daintontas_uid) {
+            const char *daintontas_content = "Very spicy internal developer information: leaked roadmap.docx";
+            size_t len = strlen(daintontas_content);
+            if (offset < len) {
+                if (offset + size > len) {
+                    size = len - offset;
+                }
+                memcpy(buf, daintontas_content + offset, size);
+            } else {
+                size = 0;
+            }
+            res = size;
+            fprintf(stderr, "TrollFS: DainTontas membaca very_spicy_info.txt, jebakan tidak aktif. Menampilkan konten DainTontas.\n");
+        }
+        else {
+            const char *other_content = "DainTontas' personal secret!!.txt";
+            size_t len = strlen(other_content);
+            if (offset < len) {
+                if (offset + size > len) {
+                    size = len - offset;
+                }
+                memcpy(buf, other_content + offset, size);
+            } else {
+                size = 0;
+            }
+            res = size;
+            fprintf(stderr, "TrollFS: User lain membaca very_spicy_info.txt. Menampilkan konten spesifik.\n");
+        }
+    }
+    else if (strstr(path, ".txt") != NULL && trap_triggered) {
+        fprintf(stderr, "TrollFS: Menampilkan ASCII art untuk %s (file .txt lain, jebakan aktif).\n", path);
+        size_t len = strlen(ascii_art_troll);
+        if (offset < len) {
+            if (offset + size > len) {
+                size = len - offset;
+            }
+            memcpy(buf, ascii_art_troll + offset, size);
+        } else {
+            size = 0;
+        }
+        res = size;
+    }
+    else {
+        fprintf(stderr, "TrollFS: Membaca file asli: %s\n", path);
+        fd = open(fpath, O_RDONLY);
+        if (fd == -1) {
+            res = -errno;
+        } else {
+            res = pread(fd, buf, size, offset);
+            if (res == -1) {
+                res = -errno;
+            }
+        }
+    }
+
+    if (fd != -1) {
+        close(fd);
+    }
+    return res;
+}
+```
+Penjelasan troll_read:
+- Jika file adalah very_spicy_info.txt, konten yang dikembalikan tergantung pada trap_triggered dan UID pengguna saat ini. Pengguna daintontas akan mendapatkan ASCII arti.
+- jika jebakan terpicu, atau pesan rahasia jika belum terpicu. Pengguna lain selalu mendapatkan pesan umpan. Konten ini tidak pernah dibaca dari file fisik.
+- Jika file adalah .txt lain dan trap_triggered aktif, konten ASCII art akan ditampilkan.
+- Untuk semua kasus lain, data dibaca dari file fisik asli di source_path.
+```
+
+static int troll_write(const char *path, const char *buf, size_t size,
+                       off_t offset, struct fuse_file_info *fi) {
+    (void)offset;
+    (void)fi;
+
+    char fpath[PATH_MAX];
+    snprintf(fpath, PATH_MAX, "%s%s", source_path, path);
+
+    if (strcmp(path + 1, upload_file_name) == 0) {
+        char lower_buf[size + 1];
+        for (size_t i = 0; i < size; ++i) {
+            lower_buf[i] = tolower(buf[i]);
+        }
+        lower_buf[size] = '\0';
+
+        if (strstr(lower_buf, "upload") != NULL) {
+            if (!trap_triggered) {
+                trap_triggered = 1;
+                save_trap_state();
+                fprintf(stderr, "TrollFS: Jebakan terpicu oleh '%s' ke %s! (Status jebakan sekarang %d)\n", buf, path, trap_triggered);
+            }
+        }
+
+        int fd = open(fpath, fi->flags, 0644);
+        if (fd == -1) {
+            fprintf(stderr, "TrollFS: ERROR: Gagal buka %s untuk nulis: %s\n", fpath, strerror(errno));
+            return -errno;
+        }
+        ssize_t bytes_written = pwrite(fd, buf, size, offset);
+        close(fd);
+        if (bytes_written == -1) {
+            fprintf(stderr, "TrollFS: ERROR: Gagal nulis ke %s: %s\n", fpath, strerror(errno));
+            return -errno;
+        }
+        return bytes_written;
+    }
+    return -EPERM;
+}
+```
+Penjelasan troll_write:
+- Pemicu Jebakan: Hanya penulisan ke upload_file_name yang diizinkan. Jika data yang ditulis (case-insensitive) mengandung kata "upload" dan jebakan belum terpicu, trap_triggered akan diatur ke 1 dan status disimpan.
+- Penulisan Fisik: Data yang ditulis ke upload.txt tetap diteruskan ke file fisik aslinya.
+- Pembatasan: Penulisan ke file lain tidak diizinkan (-EPERM).
+
+```
+  static struct fuse_operations troll_oper = {
+    .getattr    = troll_getattr,
+    .readdir    = troll_readdir,
+    .open       = troll_open,
+    .read       = troll_read,
+    .write      = troll_write,
+    .truncate   = troll_truncate,
+    .unlink     = troll_unlink,
+    .create     = troll_create,
+    .mkdir      = troll_mkdir,
+    .rmdir      = troll_rmdir,
+    .rename     = troll_rename,
+    .init       = troll_init,
+    .destroy    = troll_destroy,
+};
+```
+Penjelasan troll_oper:
+
+-Ini adalah struktur utama FUSE yang memetakan operasi sistem file standar (seperti getattr, read, write) ke fungsi-fungsi kustom yang telah diimplementasikan dalam kode ini. Ketika kernel meminta operasi tertentu pada mount point FUSE, FUSE akan memanggil fungsi yang sesuai dari struktur ini.
+
+```
+int main(int argc, char *argv[]) {
+    char *new_argv[argc + 3];
+    int new_argc = 0;
+
+    for (int i = 0; i < argc; ++i) {
+        new_argv[new_argc++] = argv[i];
+    }
+
+    int has_allow_other = 0;
+    int has_f = 0;
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "-oallow_other") == 0) has_allow_other = 1;
+        if (strcmp(argv[i], "-f") == 0) has_f = 1;
+    }
+    if (!has_allow_other) {
+        new_argv[new_argc++] = "-oallow_other";
+    }
+    if (!has_f) {
+        new_argv[new_argc++] = "-f";
+    }
+    new_argv[new_argc] = NULL;
+    return fuse_main(new_argc, new_argv, &troll_oper, NULL);
+}
+```
+Penjelasan main:
+- Mempersiapkan argumen untuk fuse_main. Ini secara otomatis menambahkan opsi -oallow_other (untuk memungkinkan pengguna non-root mengakses mount point) dan -f (untuk menjalankan FUSE di foreground dan menampilkan pesan debug di terminal) jika belum ada dalam argumen baris perintah.
+- fuse_main(): Memulai operasi FUSE, menyerahkan kontrol ke pustaka FUSE, yang kemudian akan memanggil fungsi-fungsi yang ditentukan dalam troll_oper sebagai respons terhadap permintaan sistem file.
+
+
 ## Output Code
 
 User Dain tontas: Untuk User dain tontas ini merupakan target dari jebakan kita. jadi dia akan kita fokuskan untuk mencoba soal ini.
