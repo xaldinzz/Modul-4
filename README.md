@@ -421,6 +421,15 @@ Penjelasan main:
 ## Output Code
 
 Untuk soal ini saya akan menampilkan dua terminal dimana satu punya Daintontas(Target Troll) dan Sunnybolt (User Biasa)
+![imagealt](https://github.com/xaldinzz/p/blob/main/Screenshot%20from%202025-06-22%2015-03-15.png?raw=true)
+![imagealt](https://github.com/xaldinzz/p/blob/main/Screenshot%20from%202025-06-22%2015-04-35.png?raw=true)
+
+Penjelasan Gambar:
+
+- Jadi di User Daintontas di sana terdapat ls /mnt/troll maka dia mengeluarkan upload.txt  very_spicy_info.txt hal yang sama terjadi pada user sunnybolt.
+- Untuk yang kedua kita melakukan cat /mnt/troll/very_spicy_info.txt untuk user daintontas dia mengeluarkan very spicy internal developer information :leaked roadmap.docx
+  berbeda dengan user sunnybolt yang mengeluarkan DainTontas' personal secret!!
+- yang ketiga kita akan membuat user dain tontas melakukan echo, echo disini adalah pemicu jebakan bagi user dain tontas. kita bisa liat untuk user dain tontas ketika dia mengetik echo, dan saat dia melakukan cat lagi maka ASCII art akan muncul "You fell for it again" berbeda dengan user sunny bolt bisa di liat user sudah melakukan echo tetapi ketika dia melakukan cat kembali dia mengeluarkan hal yang sama 
 
 
 
