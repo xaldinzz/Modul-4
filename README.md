@@ -430,7 +430,7 @@ int main(int argc, char *argv[]) {
     new_argv[new_argc] = NULL;
     return fuse_main(new_argc, new_argv, &troll_oper, NULL);
 }
-
+```
 
 Fungsi: Titik masuk program utama.
 - Penanganan Argumen: Mempersiapkan argumen untuk fuse_main. Ini secara otomatis menambahkan opsi -oallow_other (untuk memungkinkan pengguna non-root mengakses mount point) dan -f (untuk menjalankan FUSE di foreground dan menampilkan pesan debug di terminal) jika belum ada dalam argumen baris perintah.
