@@ -439,3 +439,6 @@ Fungsi: Titik masuk program utama.
 
 ## Output Code
 
+User Dain tontas: Untuk User dain tontas ini merupakan target dari jebakan kita. jadi dia akan kita fokuskan untuk mencoba soal ini.
+
+
